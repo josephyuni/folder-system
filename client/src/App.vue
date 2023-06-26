@@ -109,7 +109,6 @@ export default {
 </script>
 
 <style>
-/* 样式可以根据需求进行调整 */
 .app {
   display: flex;
 }
