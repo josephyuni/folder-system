@@ -102,7 +102,6 @@ async function searchFiles(keyword, directory) {
     const matchedLines = [];
     lines.forEach((line, index) => {
       if (line.includes(keyword)) {
-        // 高亮处理关键字
         const highlightedLine = line.replace(new RegExp(keyword, 'gi'), '<span class="highlight">$&</span>');
         matchedLines.push({ lineNumber: index + 1, content: highlightedLine });
       }
@@ -129,20 +128,71 @@ router.get('/directory/:folderPath', (req, res) => {
   res.json(directory);
 });
 
+// 获取文件信息
+router.get('/file/:filePath', (req, res) => {
+  const filePath = req.params.filePath;
+  const fileInfo = getFileInfo(filePath);
+  res.json(fileInfo);
+});
+
 // 搜索文件
 router.post('/search', async (req, res) => {
   const keyword = req.body.keyword;
   const directory = req.body.directory;
+
+  if (!keyword || !directory) {
+    return res.status(400).json({ error: 'Missing keyword or directory' });
+  }
+
   const results = await searchFiles(keyword, directory);
   res.json(results);
 });
 
-app.use('/api', router);
+
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // 建立索引
-buildIndex().then(() => {
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  });
-});
+async function buildIndex() {
+  const indexExists = await client.indices.exists({ index: 'files' });
+  if (indexExists.body) {
+    console.log('Index already exists.');
+    return;
+  }
+
+  const documents = [];
+
+  // 遍历文件夹，提取PDF和Word文件
+  const folderPath = path.join(__dirname, 'documents');
+  const files = fs.readdirSync(folderPath);
+  for (const file of files) {
+    const filePath = path.join(folderPath, file);
+    if (file.endsWith('.pdf')) {
+      // 解析PDF文本
+      const pdf = await PDFDocument.load(fs.readFileSync(filePath));
+      const pages = pdf.getPages();
+      let text = '';
+      for (const page of pages) {
+        text += await page.getText();
+      }
+      documents.push({ path: filePath, text });
+    } else if (file.endsWith('.docx')) {
+      // 解析Word文本
+      const result = await mammoth.extractRawText({ path: filePath });
+      const text = result.value.trim();
+      documents.push({ path: filePath, text });
+    }
+  }
+
+  // 建立索引
+  const body = documents.flatMap(doc => [{ index: { _index: 'files' } }, doc]);
+  await client.indices.create({ index: 'files' });
+  await client.bulk({ refresh: true, body });
+
+  // 保存索引到文件
+  fs.writeFileSync(indexPath, JSON.stringify(documents));
+
+  console.log('Index created successfully.');
+}
+
