@@ -5,14 +5,26 @@
       <h2>文件夹列表</h2>
       <ul>
         <li v-for="folder in folders" :key="folder.path">
-          <button @click="loadFolder(folder.path)">{{ folder.name }}</button>
+          <button @click="selectDirectory(folder.path)">{{ folder.name }}</button>
         </li>
       </ul>
     </div>
     <div class="content">
+      <h2>选择文件夹</h2>
+      <div v-for="directory in selectedDirectories" :key="directory.path">
+        <h3>{{ directory.name }}</h3>
+        <ul>
+          <li v-for="folder in directory.folders" :key="folder.path">
+            <button @click="selectDirectory(folder.path)">{{ folder.name }}</button>
+          </li>
+        </ul>
+      </div>
+      <div v-if="selectedDirectories.length > 0">
+        <button @click="searchFiles">搜索</button>
+      </div>
+
       <h2>搜索</h2>
       <input type="text" v-model="keyword" placeholder="输入关键字">
-      <button @click="searchFiles">搜索</button>
 
       <h2>搜索结果</h2>
       <div v-if="searchedFiles.length === 0">没有搜索结果</div>
@@ -34,6 +46,7 @@ export default {
   data() {
     return {
       folders: [],
+      selectedDirectories: [],
       keyword: '',
       searchedFiles: []
     };
@@ -52,15 +65,19 @@ export default {
           console.error('Error:', error);
         });
     },
-    loadFolder(folderPath) {
-      fetch(`/api/directory/${folderPath}`)
-        .then(response => response.json())
-        .then(data => {
-          this.folders = data.folders;
-        })
-        .catch(error => {
-          console.error('Error:', error);
-        });
+    selectDirectory(directoryPath) {
+      if (directoryPath) {
+        fetch(`/api/directory/${directoryPath}`)
+          .then(response => response.json())
+          .then(data => {
+            this.selectedDirectories.push(data);
+          })
+          .catch(error => {
+            console.error('Error:', error);
+          });
+      } else {
+        this.selectedDirectories.pop();
+      }
     },
     searchFiles() {
       if (this.keyword.trim() === '') {
@@ -69,7 +86,7 @@ export default {
 
       const requestData = {
         keyword: this.keyword,
-        directory: '' // 设置为当前文件夹路径
+        directory: this.selectedDirectories[this.selectedDirectories.length - 1].path
       };
 
       fetch('/api/search', {
