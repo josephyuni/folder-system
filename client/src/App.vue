@@ -1,156 +1,162 @@
-<!-- App.vue -->
 <template>
   <div class="app">
-    <div class="sidebar">
-      <h2>文件夹列表</h2>
-      <ul>
-        <li v-for="folder in folders" :key="folder.path">
-          <button @click="selectDirectory(folder.path)">{{ folder.name }}</button>
-        </li>
-      </ul>
+    <div class="folder-tree">
+      <h3>选择文件夹</h3>
+      <input type="file" @change="selectFolder" directory webkitdirectory />
+      <div class="selected-folder">{{ selectedFolder }}</div>
     </div>
-    <div class="content">
-      <h2>选择文件夹</h2>
-      <div v-for="directory in selectedDirectories" :key="directory.path">
-        <h3>{{ directory.name }}</h3>
-        <ul>
-          <li v-for="folder in directory.folders" :key="folder.path">
-            <button @click="selectDirectory(folder.path)">{{ folder.name }}</button>
-          </li>
-        </ul>
-      </div>
-      <div v-if="selectedDirectories.length > 0">
-        <button @click="searchFiles">搜索</button>
-      </div>
-
-      <h2>搜索</h2>
-      <input type="text" v-model="keyword" placeholder="输入关键字">
-
-      <h2>搜索结果</h2>
-      <div v-if="searchedFiles.length === 0">没有搜索结果</div>
-      <div v-else>
-        <div v-for="file in searchedFiles" :key="file.path">
-          <h3>{{ file.path }}</h3>
-          <div v-for="line in file.lines" :key="line.lineNumber">
-            <div class="line-number">{{ line.lineNumber }}</div>
-            <div class="line-content" v-html="line.content"></div>
+    <div class="search">
+      <h3>搜索</h3>
+      <el-input v-model="keyword" placeholder="输入关键字"></el-input>
+      <el-button type="primary" @click="search">搜索</el-button>
+    </div>
+    <div class="results">
+      <h3>搜索结果</h3>
+      <div v-if="searchResults.length === 0">无搜索结果</div>
+      <div class="result-item" v-for="(result, index) in searchResults" :key="index">
+        <div class="result-path">{{ result.filePath }}</div>
+        <div class="result-content">
+          <div class="result-lines">
+            <div class="line-number" v-for="(line, index) in result.lines" :key="index">{{ line.lineNumber }}</div>
+            <div class="line-content" v-for="(line, index) in result.lines" :key="index" v-html="highlightKeyword(line.content)"></div>
           </div>
         </div>
       </div>
+    </div>
+    <div class="save-results" v-if="selectedResults.length > 0">
+      <h3>保存结果</h3>
+      <el-button type="primary" @click="saveResults">保存结果</el-button>
     </div>
   </div>
 </template>
 
 <script>
+import { ref, reactive } from 'vue';
+import axios from 'axios';
+
+const API_URL = 'http://localhost:3000';
+
+
 export default {
-  data() {
-    return {
-      folders: [],
-      selectedDirectories: [],
-      keyword: '',
-      searchedFiles: []
+  name: 'App',
+  setup() {
+    const selectedFolder = ref('');
+    const keyword = ref('');
+    const searchResults = reactive([]);
+    const selectedResults = ref([]);
+
+    const selectFolder = (event) => {
+      const file = event.target.files[0];
+      selectedFolder.value = file.path;
     };
-  },
-  mounted() {
-    this.loadRootDirectory();
-  },
-  methods: {
-    loadRootDirectory() {
-      fetch('/api/directory')
-        .then(response => response.json())
-        .then(data => {
-          this.folders = data.folders;
-        })
-        .catch(error => {
-          console.error('Error:', error);
-        });
-    },
-    selectDirectory(directoryPath) {
-      if (directoryPath) {
-        fetch(`/api/directory/${directoryPath}`)
-          .then(response => response.json())
-          .then(data => {
-            this.selectedDirectories.push(data);
-          })
-          .catch(error => {
-            console.error('Error:', error);
-          });
-      } else {
-        this.selectedDirectories.pop();
-      }
-    },
-    searchFiles() {
-      if (this.keyword.trim() === '') {
+
+    const search = async () => {
+      if (!selectedFolder.value || !keyword.value) {
         return;
       }
 
-      const requestData = {
-        keyword: this.keyword,
-        directory: this.selectedDirectories[this.selectedDirectories.length - 1].path
-      };
-
-      fetch('/api/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestData)
-      })
-        .then(response => response.json())
-        .then(data => {
-          this.searchedFiles = data;
-        })
-        .catch(error => {
-          console.error('Error:', error);
+      try {
+        const response = await axios.post(`${API_URL}/search`, {
+          folderPath: selectedFolder.value,
+          keyword: keyword.value
         });
-    }
+
+        searchResults.length = 0;
+        searchResults.push(...response.data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const saveResults = () => {
+      const lines = selectedResults.value.map(result => {
+        return `${result.filePath}\n${result.lines.map(line => `${line.lineNumber}\t${line.content}`).join('\n')}\n`;
+      }).join('\n');
+
+      const blob = new Blob([lines], { type: 'text/plain' });
+      const downloadLink = document.createElement('a');
+      downloadLink.href = URL.createObjectURL(blob);
+      downloadLink.download = 'search_results.txt';
+      downloadLink.click();
+    };
+
+    const highlightKeyword = (content) => {
+      const regex = new RegExp(keyword.value, 'gi');
+      return content.replace(regex, '<span class="highlighted">$&</span>');
+    };
+
+    return {
+      selectedFolder,
+      keyword,
+      searchResults,
+      selectedResults,
+      selectFolder,
+      search,
+      saveResults,
+      highlightKeyword
+    };
   }
 };
 </script>
 
-<style>
+<style scoped>
 .app {
   display: flex;
-}
-
-.sidebar {
-  flex: 0 0 200px;
-  background-color: #f0f0f0;
+  flex-direction: column;
+  align-items: center;
   padding: 20px;
 }
 
-.content {
-  flex: 1;
-  padding: 20px;
+.folder-tree {
+  margin-bottom: 20px;
 }
 
-h2 {
-  margin-top: 0;
+.selected-folder {
+  margin-top: 10px;
 }
 
-ul {
-  list-style: none;
-  padding: 0;
+.search {
+  margin-bottom: 20px;
 }
 
-li {
+.results {
+  width: 100%;
+  max-width: 800px;
+}
+
+.result-item {
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.result-path {
+  font-weight: bold;
   margin-bottom: 10px;
+}
+
+.result-content {
+  background-color: #f5f5f5;
+  padding: 10px;
 }
 
 .line-number {
   display: inline-block;
   width: 30px;
-  text-align: right;
-  padding-right: 5px;
-  color: #888;
+  margin-right: 10px;
 }
 
 .line-content {
   display: inline-block;
-  padding-left: 5px;
+  white-space: pre-wrap;
 }
 
-.highlight {
+.highlighted {
   background-color: yellow;
+}
+
+.save-results {
+  margin-top: 20px;
 }
 </style>
