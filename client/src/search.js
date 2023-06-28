@@ -1,58 +1,55 @@
 const fs = require('fs');
 const path = require('path');
-const PDFParser = require('pdf2json');
 const mammoth = require('mammoth');
-const Docxtemplater = require('docxtemplater');
+const { PDFDocument } = require('pdf-lib');
 
 // 建立索引
-async function indexFiles(directoryPath) {
-  const index = [];
-  const files = await readDirectory(directoryPath);
+function indexFiles(directoryPath) {
+  return new Promise((resolve, reject) => {
+    readDirectory(directoryPath)
+      .then(files => {
+        const indexPromises = files.map(file => {
+          const filePath = path.join(directoryPath, file);
+          const extension = getFileExtension(file);
 
-  for (const file of files) {
-    const filePath = path.join(directoryPath, file);
-    const extension = getFileExtension(file);
-
-    if (extension === 'pdf') {
-      const fileContents = await readPdf(filePath);
-      const lines = fileContents.split('\n');
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        index.push({
-          path: filePath,
-          lineNumber: i + 1,
-          content: line.trim()
+          if (extension === 'pdf') {
+            return readPdf(filePath)
+              .then(fileContents => {
+                const lines = fileContents.split('\n');
+                const fileIndex = lines.map((line, index) => ({
+                  path: filePath,
+                  lineNumber: index + 1,
+                  content: line.trim()
+                }));
+                return fileIndex;
+              });
+          } else if (extension === 'docx' || extension === 'doc') {
+            return readDoc(filePath)
+              .then(fileContents => {
+                const lines = fileContents.split('\n');
+                const fileIndex = lines.map((line, index) => ({
+                  path: filePath,
+                  lineNumber: index + 1,
+                  content: line.trim()
+                }));
+                return fileIndex;
+              });
+          }
         });
-      }
-    } else if (extension === 'docx') {
-      const fileContents = await readDocx(filePath);
-      const lines = fileContents.split('\n');
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        index.push({
-          path: filePath,
-          lineNumber: i + 1,
-          content: line.trim()
-        });
-      }
-    } else if (extension === 'doc') {
-      const fileContents = await readDoc(filePath);
-      const lines = fileContents.split('\n');
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        index.push({
-          path: filePath,
-          lineNumber: i + 1,
-          content: line.trim()
-        });
-      }
-    }
-  }
-
-  return index;
+        Promise.all(indexPromises)
+          .then(results => {
+            const index = results.flat();
+            resolve(index);
+          })
+          .catch(error => {
+            reject(error);
+          });
+      })
+      .catch(error => {
+        reject(error);
+      });
+  });
 }
 
 // 读取目录中的文件
@@ -76,103 +73,46 @@ function getFileExtension(fileName) {
 // 读取PDF文件内容
 function readPdf(filePath) {
   return new Promise((resolve, reject) => {
-    const parser = new PDFParser();
-
-    parser.on('pdfParser_dataError', error => reject(error));
-    parser.on('pdfParser_dataReady', data => {
-      const pages = data.formImage.Pages;
-      const content = [];
-
-      for (const page of pages) {
-        for (const text of page.Texts) {
-          content.push(decodeURIComponent(text.R[0].T));
-        }
-      }
-
-      resolve(content.join(' '));
-    });
-
-    parser.loadPDF(filePath);
-  });
-}
-
-// 读取Docx文件内容
-function readDocx(filePath) {
-  return new Promise((resolve, reject) => {
-    fs.readFile(filePath, 'binary', (error, fileData) => {
+    fs.readFile(filePath, (error, fileContents) => {
       if (error) {
         reject(error);
       } else {
-        const docxData = new Uint8Array(Buffer.from(fileData));
-        const docx = new Docxtemplater();
-        docx.loadZip(docxData);
+        const pdfDoc = PDFDocument.load(fileContents);
 
-        const extractedText = docx.getFullText().trim();
-        resolve(extractedText);
+        const content = [];
+        for (const page of pdfDoc.getPages()) {
+          const text = page.getTextContent();
+          text.items.forEach(item => {
+            content.push(item.str);
+          });
+        }
+
+        resolve(content.join(' '));
       }
     });
   });
 }
 
-// 读取Doc文件内容
+// 读取DOCX和DOC文件内容
 function readDoc(filePath) {
   return new Promise((resolve, reject) => {
-    fs.readFile(filePath, 'binary', (error, fileData) => {
+    fs.readFile(filePath, 'binary', (error, fileContents) => {
       if (error) {
         reject(error);
       } else {
-        const docData = new Uint8Array(Buffer.from(fileData));
-        const doc = new Docxtemplater();
-        doc.loadZip(docData);
-
-        const extractedText = doc.getFullText().trim();
-        resolve(extractedText);
+        mammoth.extractRawText({ buffer: fileContents })
+          .then(result => {
+            const extractedText = result.value.trim();
+            resolve(extractedText);
+          })
+          .catch(error => {
+            reject(error);
+          });
       }
     });
-  });
-}
-
-// 搜索文件内容
-function searchFiles(index, keyword) {
-  const results = [];
-
-  for (const entry of index) {
-    if (entry.content.includes(keyword)) {
-      results.push(entry);
-    }
-  }
-
-  return results;
-}
-
-// 保存搜索结果到文件
-function saveResultsToFile(results) {
-  let fileContent = '';
-
-  for (const result of results) {
-    fileContent += `路径：${result.path}\n`;
-    fileContent += '-------------------------------\n';
-
-    for (const line of result.lines) {
-      fileContent += `行号${line.lineNumber}\t${line.content}\n`;
-    }
-
-    fileContent += '\n';
-  }
-
-  const fileName = '搜索结果.txt';
-
-  fs.writeFile(fileName, fileContent, 'utf8', (error) => {
-    if (error) {
-      console.error('保存搜索结果到文件时发生错误', error);
-    } else {
-      console.log(`搜索结果已保存至 ${fileName}`);
-    }
   });
 }
 
 module.exports = {
-  indexFiles,
-  searchFiles,
-  saveResultsToFile
+  indexFiles
 };
