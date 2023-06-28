@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // server.js
 
 const express = require('express');
@@ -148,52 +147,3 @@ router.post('/search', async (req, res) => {
   const results = await searchFiles(keyword, directory);
   res.json(results);
 });
-
-
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, 'public')));
-
-// 建立索引
-async function buildIndex() {
-  const indexExists = await client.indices.exists({ index: 'files' });
-  if (indexExists.body) {
-    console.log('Index already exists.');
-    return;
-  }
-
-  const documents = [];
-
-  // 遍历文件夹，提取PDF和Word文件
-  const folderPath = path.join(__dirname, 'documents');
-  const files = fs.readdirSync(folderPath);
-  for (const file of files) {
-    const filePath = path.join(folderPath, file);
-    if (file.endsWith('.pdf')) {
-      // 解析PDF文本
-      const pdf = await PDFDocument.load(fs.readFileSync(filePath));
-      const pages = pdf.getPages();
-      let text = '';
-      for (const page of pages) {
-        text += await page.getText();
-      }
-      documents.push({ path: filePath, text });
-    } else if (file.endsWith('.docx')) {
-      // 解析Word文本
-      const result = await mammoth.extractRawText({ path: filePath });
-      const text = result.value.trim();
-      documents.push({ path: filePath, text });
-    }
-  }
-
-  // 建立索引
-  const body = documents.flatMap(doc => [{ index: { _index: 'files' } }, doc]);
-  await client.indices.create({ index: 'files' });
-  await client.bulk({ refresh: true, body });
-
-  // 保存索引到文件
-  fs.writeFileSync(indexPath, JSON.stringify(documents));
-
-  console.log('Index created successfully.');
-}
-
