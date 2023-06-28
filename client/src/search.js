@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { promisify } = require('util');
-
+const PDFParser = require('pdf2json');
+const mammoth = require('mammoth');
+const Docxtemplater = require('docxtemplater');
 const readFileAsync = promisify(fs.readFile);
 
 /**
