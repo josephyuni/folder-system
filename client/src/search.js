@@ -5,68 +5,57 @@ const mammoth = require('mammoth');
 const Docxtemplater = require('docxtemplater');
 const readFileAsync = promisify(fs.readFile);
 
-/**
- * 索引单个文件
- * @param {string} filePath 文件路径
- * @returns {Promise<object|null>} 索引结果对象或者null（如果出现错误）
- */
-async function indexFile(filePath) {
-  try {
-    const content = await readFileAsync(filePath, 'utf8');
-    const lines = content.split('\n').map((line, index) => ({ lineNumber: index + 1, content: line }));
-    return { filePath, lines };
-  } catch (error) {
-    console.error(`索引文件时发生错误：${filePath}`, error);
-    return null;
-  }
-}
-
-/**
- * 索引目录下的所有文件
- * @param {string} directoryPath 目录路径
- * @returns {Promise<Array<object>>} 索引结果对象数组
- */
+// 建立索引
 async function indexFiles(directoryPath) {
+  const index = [];
   const files = await readDirectory(directoryPath);
-  const indexedFiles = [];
 
   for (const file of files) {
     const filePath = path.join(directoryPath, file);
-    const indexedFile = await indexFile(filePath);
+    const extension = getFileExtension(file);
 
-    if (indexedFile) {
-      indexedFiles.push(indexedFile);
+    if (extension === 'pdf') {
+      const fileContents = await readPdf(filePath);
+      const lines = fileContents.split('\n');
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        index.push({
+          path: filePath,
+          lineNumber: i + 1,
+          content: line.trim()
+        });
+      }
+    } else if (extension === 'docx') {
+      const fileContents = await readDocx(filePath);
+      const lines = fileContents.split('\n');
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        index.push({
+          path: filePath,
+          lineNumber: i + 1,
+          content: line.trim()
+        });
+      }
+    } else if (extension === 'doc') {
+      const fileContents = await readDoc(filePath);
+      const lines = fileContents.split('\n');
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        index.push({
+          path: filePath,
+          lineNumber: i + 1,
+          content: line.trim()
+        });
+      }
     }
   }
 
-  return indexedFiles;
+  return index;
 }
 
-/**
- * 读取目录下的所有文件
- * @param {string} directoryPath 目录路径
- * @returns {Promise<Array<string>>} 文件名数组
- */
-async function readDirectory(directoryPath) {
-  try {
-    const files = await promisify(fs.readdir)(directoryPath);
-    return files.filter(file => isSupportedFile(file));
-  } catch (error) {
-    console.error(`读取目录时发生错误：${directoryPath}`, error);
-    return [];
-  }
-}
-
-/**
- * 判断文件是否为支持的文件类型
- * @param {string} file 文件名
- * @returns {boolean} 是否为支持的文件类型
- */
-function isSupportedFile(file) {
-  const supportedExtensions = ['.pdf', '.doc', '.docx'];
-  const fileExtension = path.extname(file);
-  return supportedExtensions.includes(fileExtension);
-}
 
 /**
  * 搜索文件中包含指定查询的内容
