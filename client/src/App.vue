@@ -1,32 +1,18 @@
 <template>
-  <div class="app">
-    <div class="folder-tree">
-      <h3>选择文件夹</h3>
-      <input type="file" @change="selectFolder" directory webkitdirectory />
-      <div class="selected-folder">{{ selectedFolder }}</div>
-    </div>
-    <div class="search">
-      <h3>搜索</h3>
-      <el-input v-model="keyword" placeholder="输入关键字"></el-input>
-      <el-button type="primary" @click="search">搜索</el-button>
-    </div>
-    <div class="results">
-      <h3>搜索结果</h3>
-      <div v-if="searchResults.length === 0">无搜索结果</div>
-      <div class="result-item" v-for="(result, index) in searchResults" :key="index">
-        <div class="result-path">{{ result.filePath }}</div>
-        <div class="result-content">
-          <div class="result-lines">
-            <div class="line-number" v-for="(line, index) in result.lines" :key="index">{{ line.lineNumber }}</div>
-            <div class="line-content" v-for="(line, index) in result.lines" :key="index" v-html="highlightKeyword(line.content)"></div>
-          </div>
-        </div>
+  <div>
+    <input type="file" @change="handleFileSelect" multiple>
+    <input type="text" v-model="searchQuery" placeholder="输入关键字">
+    <button @click="search">搜索</button>
+
+    <div v-for="(result, index) in searchResults" :key="index">
+      <h3>{{ result.path }}</h3>
+      <hr>
+      <div v-for="line in result.lines" :key="line.lineNumber">
+        <p v-html="highlightKeywords(line.content)"></p>
       </div>
     </div>
-    <div class="save-results" v-if="selectedResults.length > 0">
-      <h3>保存结果</h3>
-      <el-button type="primary" @click="saveResults">保存结果</el-button>
-    </div>
+
+    <button @click="saveResults">保存</button>
   </div>
 </template>
 
