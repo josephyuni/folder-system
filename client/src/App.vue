@@ -31,70 +31,34 @@
 </template>
 
 <script>
-import { ref, reactive } from 'vue';
-import axios from 'axios';
-
-const API_URL = 'http://localhost:3000';
-
+const { searchFiles, saveResultsToFile } = require('./search');
 
 export default {
-  name: 'App',
-  setup() {
-    const selectedFolder = ref('');
-    const keyword = ref('');
-    const searchResults = reactive([]);
-    const selectedResults = ref([]);
-
-    const selectFolder = (event) => {
-      const file = event.target.files[0];
-      selectedFolder.value = file.path;
-    };
-
-    const search = async () => {
-      if (!selectedFolder.value || !keyword.value) {
-        return;
-      }
-
-      try {
-        const response = await axios.post(`${API_URL}/search`, {
-          folderPath: selectedFolder.value,
-          keyword: keyword.value
-        });
-
-        searchResults.length = 0;
-        searchResults.push(...response.data);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-
-    const saveResults = () => {
-      const lines = selectedResults.value.map(result => {
-        return `${result.filePath}\n${result.lines.map(line => `${line.lineNumber}\t${line.content}`).join('\n')}\n`;
-      }).join('\n');
-
-      const blob = new Blob([lines], { type: 'text/plain' });
-      const downloadLink = document.createElement('a');
-      downloadLink.href = URL.createObjectURL(blob);
-      downloadLink.download = 'search_results.txt';
-      downloadLink.click();
-    };
-
-    const highlightKeyword = (content) => {
-      const regex = new RegExp(keyword.value, 'gi');
-      return content.replace(regex, '<span class="highlighted">$&</span>');
-    };
-
+  data() {
     return {
-      selectedFolder,
-      keyword,
-      searchResults,
-      selectedResults,
-      selectFolder,
-      search,
-      saveResults,
-      highlightKeyword
+      selectedFiles: [],
+      searchQuery: '',
+      searchResults: []
     };
+  },
+  methods: {
+    // 处理文件选择事件
+    handleFileSelect(event) {
+      this.selectedFiles = Array.from(event.target.files);
+    },
+    // 执行搜索
+    async search() {
+      this.searchResults = await searchFiles(this.selectedFiles, this.searchQuery);
+    },
+    // 高亮显示关键字
+    highlightKeywords(content) {
+      const regex = new RegExp(`(${this.searchQuery})`, 'gi');
+      return content.replace(regex, '<span class="highlighted">$1</span>');
+    },
+    // 保存搜索结果
+    saveResults() {
+      saveResultsToFile(this.searchResults);
+    }
   }
 };
 </script>
