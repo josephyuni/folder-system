@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>文件搜索</title>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+</head>
+<body>
+    <h1>文件搜索</h1>
+    <form method="POST" action="/">
+        <label for="selected_path">选择路径：</label>
+        <select id="selected_path" name="selected_path">
+            <option value="">请选择路径</option>
+        </select>
+        <br><br>
+        <label for="keyword">关键字：</label>
+        <input type="text" id="keyword" name="keyword" required>
+        <br><br>
+        <input type="submit" value="搜索">
+    </form>
+    <br>
+    <div id="results">
+        <!-- 结果将在此处显示 -->
+    </div>
+
+    <script>
+        // 获取根目录下的盘符列表
+        $.ajax({
+            url: "/root-drives",
+            method: "GET",
+            success: function (data) {
+                var select = $("#selected_path");
+                select.empty();
+                select.append($("<option>").attr('value', '').text('请选择路径'));
+                $.each(data, function (index, value) {
+                    select.append($("<option>").attr('value', value).text(value + ':\\'));
+                });
+            }
+        });
+
+        // 根据选择的路径获取子文件夹列表
+        $("#selected_path").change(function () {
+            var selectedPath = $(this).val();
+            if (selectedPath !== "") {
+                $.ajax({
+                    url: "/subdirectories",
+                    method: "GET",
+                    data: {
+                        path: selectedPath
+                    },
+                    success: function (data) {
+                        var select = $("#selected_path");
+                        select.empty();
+                        select.append($("<option>").attr('value', '').text('请选择路径'));
+                        $.each(data, function (index, value) {
+                            select.append($("<option>").attr('value', selectedPath + '\\' + value).text(value));
+                        });
+                    }
+                });
+            }
+        });
+
+        // 提交表单时搜索文件内容并显示结果
+        $("form").submit(function (event) {
+            event.preventDefault();
+            var selectedPath = $("#selected_path").val();
+            var keyword = $("#keyword").val();
+
+            $.ajax({
+                url: "/",
+                method: "POST",
+                data: {
+                    selected_path: selectedPath,
+                    keyword: keyword
+                },
+                success: function (data) {
+                    $("#results").html(data);
+                }
+            });
+        });
+
+        // 获取文件内容
+        function getFileContent(path, line, keyword) {
+            $.ajax({
+                url: "/file-content",
+                method: "GET",
+                data: {
+                    path: path,
+                    line: line,
+                    keyword: keyword
+                },
+                success: function (data) {
+                    // 处理文件内容，例如将结果显示在模态框中
+                    // ...
+                }
+            });
+        }
+    </script>
+</body>
+</html>
