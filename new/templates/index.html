@@ -2,14 +2,211 @@
 <html>
 <head>
     <title>文件搜索系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            text-align: center;
+            padding: 20px;
+            background-color: #f2f2f2;
+            margin: 0;
+            font-size: 30px;
+        }
+
+        form {
+            text-align: center;
+            padding: 20px;
+            background-color: #dff5c1d5;
+            margin: 20px;
+            border-radius: 10px;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #b8e25ec8;
+            border-radius: 10px;
+            width: 500px;
+        }
+
+        button {
+            size: 15px;
+            padding: 10px 20px;
+            margin: 14px;
+            font-size: 12px;
+            border: none;
+            border-radius: 20px;
+            background-color: #6cb46f;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0.3) 70%, rgba(255, 255, 255, 0) 100%);
+            transform: scale(0);
+            transition: transform 0.5s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:hover:after {
+            transform: scale(1);
+        }
+
+        #path-buttons {
+            text-align: center;
+            padding: 20px;
+            background-color: #f2f4eb;
+            border-radius: 20px;
+            margin: 20px;
+        }
+
+        #path-buttons button {
+            margin: 8px;
+            font-size: 15\4px;
+            border: none;
+            border-radius: 15px;
+            background-color: #e3f8f1;
+            color: #555;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #path-buttons button:after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0.3) 70%, rgba(255, 255, 255, 0) 100%);
+            transform: scale(0);
+            transition: transform 0.5s ease;
+        }
+
+        #path-buttons button:hover {
+            background-color: #d2f1bc;
+        }
+
+        #path-buttons button:hover:after {
+            transform: scale(1);
+        }
+
+        #results {
+            
+            background-color: #eaeae3a9;
+            border-radius: 10px;
+            margin: 20px;
+        }
+
+        #results h3 {
+            padding: 5px;
+            font-size: 20px;
+            margin: 15px;
+            background-color: #bec4ca;
+            border-radius: 18px;
+        }
+
+        .result-item {
+            margin: 10px;
+            padding: 10px;
+            background-color: #e8f6b5;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .result-item:hover {
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-item-checkbox {
+            margin-right: 10px;
+            padding: 10px;
+        }
+
+        .result-item-path {
+            font-size: 14px;
+            color: #dad5d5;
+            margin: 10px;
+        }
+
+        .result-item-line {
+            font-size: 14px;
+            color: #d8cdcd;
+            margin-top: 5px;
+        }
+
+        .result-item-content {
+            font-size: 14px;
+            color: #c1bcbc;
+            margin-top: 5px;
+        }
+
+        .result-item-highlight {
+            background-color: rgba(79, 233, 250, 0.879);
+        }
+
+        .save-button {
+            padding: 10px 20px;
+            font-size: 14px;
+            border: none;
+            border-radius: 10px;
+            background-color: #2196F3;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .save-button:after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0.3) 70%, rgba(255, 255, 255, 0) 100%);
+            transform: scale(0);
+            transition: transform 0.5s ease;
+        }
+
+        .save-button:hover {
+            background-color: #1e7fd6;
+        }
+
+        .save-button:hover:after {
+            transform: scale(1);
+        }
+    </style>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
     <h1>文件搜索系统</h1>
     <form id="search-form" action="/" method="POST">
-        <input type="text" name="keyword" placeholder="输入关键字" required>
+        <br>
         <input type="text" id="selected-path" name="selected_path" placeholder="选择路径" required readonly>
         <button type="button" onclick="getRootDrives()">选择路径</button>
+        <br>
+        <input type="text" name="keyword" placeholder="输入关键字" required>
         <button type="submit">搜索</button>
     </form>
     <div id="path-buttons"></div>

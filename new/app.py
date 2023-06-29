@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, jsonify
 import os
 import re
-import docx
+import docx 
 import PyPDF2
+from win32com import client as wc
+import pythoncom
 
 app = Flask(__name__)
 
@@ -44,8 +46,19 @@ def search_files(path, keyword):
 
 # 检索关键字
 def search_keyword_in_file(file_path, keyword):
-    if file_path.endswith('.doc') or file_path.endswith('.docx'):
+    pythoncom.CoInitialize()
+    if file_path.endswith('.docx'):
         doc = docx.Document(file_path)
+        for paragraph in doc.paragraphs:
+            if re.search(keyword, paragraph.text, re.IGNORECASE):
+                return True
+    elif file_path.endswith('.doc'):
+        word = wc.Dispatch("Word.Application")
+        doc = word.Documents.Open(file_path)
+        doc.SaveAs(file_path+'.docx', 12)   
+        doc.Close()
+        word.Quit()
+        doc = docx.Document(file_path+'.docx')
         for paragraph in doc.paragraphs:
             if re.search(keyword, paragraph.text, re.IGNORECASE):
                 return True
@@ -59,9 +72,21 @@ def search_keyword_in_file(file_path, keyword):
 
 # 获取文件内容
 def get_file_content(file_path, keyword):
+    pythoncom.CoInitialize()
     content = []
-    if file_path.endswith('.doc') or file_path.endswith('.docx'):
+    if file_path.endswith('.docx'):
         doc = docx.Document(file_path)
+        for i, paragraph in enumerate(doc.paragraphs, start=1):
+            if re.search(keyword, paragraph.text, re.IGNORECASE):
+                highlighted_text = re.sub(rf'({keyword})', r'<mark>\1</mark>', paragraph.text, flags=re.IGNORECASE)
+                content.append({'line': i, 'text': highlighted_text})
+    elif file_path.endswith('.doc') :
+        # word = wc.Dispatch("Word.Application")
+        # doc = word.Documents.Open(file_path)
+        # doc.SaveAs(file_path+'.docx', 12)   
+        # doc.Close()
+        # word.Quit()
+        doc = docx.Document(file_path+'.docx')
         for i, paragraph in enumerate(doc.paragraphs, start=1):
             if re.search(keyword, paragraph.text, re.IGNORECASE):
                 highlighted_text = re.sub(rf'({keyword})', r'<mark>\1</mark>', paragraph.text, flags=re.IGNORECASE)
@@ -69,11 +94,14 @@ def get_file_content(file_path, keyword):
     elif file_path.endswith('.pdf'):
         with open(file_path, 'rb') as f:
             pdf_reader = PyPDF2.PdfReader(f)
-            for i, page in enumerate(pdf_reader.pages, start=1):
-                text = page.extract_text()
-                if re.search(keyword, text, re.IGNORECASE):
-                    highlighted_text = re.sub(rf'({keyword})', r'<mark>\1</mark>', text, flags=re.IGNORECASE)
-                    content.append({'line': i, 'text': highlighted_text})
+            for page in pdf_reader.pages:
+                txt = page.extract_text()
+                txt=txt.split(" ")
+                for i, content_line in enumerate(txt, start=1):
+                    if re.search(keyword, content_line, re.IGNORECASE):
+                        highlighted_text = re.sub(rf'({keyword})', r'<mark>\1</mark>', content_line, flags=re.IGNORECASE)
+                        content.append({'line': i, 'text': highlighted_text})
+
     return content
 
 # 主页
