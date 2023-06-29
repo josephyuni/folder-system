@@ -1,98 +1,114 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>文件搜索</title>
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <title>文件搜索系统</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        /* 样式定义 */
+        .folder-btn {
+            margin-bottom: 5px;
+        }
+    </style>
 </head>
 <body>
-    <h1>文件搜索</h1>
-    <form method="POST" action="/">
-        <label for="selected_path">选择路径：</label>
-        <select id="selected_path" name="selected_path">
-            <option value="">请选择路径</option>
-        </select>
-        <br><br>
+    <h1>文件搜索系统</h1>
+    <form id="search-form" action="/" method="POST">
+        <label for="selected-path">选择路径：</label>
+        <div id="path-buttons">
+            <button type="button" class="folder-btn" onclick="getRootDrives()">选择文件夹</button>
+        </div>
+        <br>
         <label for="keyword">关键字：</label>
-        <input type="text" id="keyword" name="keyword" required>
-        <br><br>
-        <input type="submit" value="搜索">
+        <input type="text" id="keyword" name="keyword">
+        <input type="hidden" id="selected-path" name="selected_path">
+        <br>
+        <button type="button" onclick="submitForm()">搜索</button>
     </form>
     <br>
+    <h2>搜索结果：</h2>
     <div id="results">
-        <!-- 结果将在此处显示 -->
+        {% for result in results %}
+        <div class="result-item">
+            <p>路径：{{ results.path }}</p>
+            <hr>
+            {% for line in result.lines %}
+            <p>行号{{ lines.line_number }}  {{ content }}</p>
+            {% endfor %}
+        </div>
+        {% endfor %}
     </div>
+    
 
     <script>
-        // 获取根目录下的盘符列表
-        $.ajax({
-            url: "/root-drives",
-            method: "GET",
-            success: function (data) {
-                var select = $("#selected_path");
-                select.empty();
-                select.append($("<option>").attr('value', '').text('请选择路径'));
-                $.each(data, function (index, value) {
-                    select.append($("<option>").attr('value', value).text(value + ':\\'));
-                });
-            }
-        });
-
-        // 根据选择的路径获取子文件夹列表
-        $("#selected_path").change(function () {
-            var selectedPath = $(this).val();
-            if (selectedPath !== "") {
-                $.ajax({
-                    url: "/subdirectories",
-                    method: "GET",
-                    data: {
-                        path: selectedPath
-                    },
-                    success: function (data) {
-                        var select = $("#selected_path");
-                        select.empty();
-                        select.append($("<option>").attr('value', '').text('请选择路径'));
-                        $.each(data, function (index, value) {
-                            select.append($("<option>").attr('value', selectedPath + '\\' + value).text(value));
-                        });
-                    }
-                });
-            }
-        });
-
-        // 提交表单时搜索文件内容并显示结果
-        $("form").submit(function (event) {
-            event.preventDefault();
-            var selectedPath = $("#selected_path").val();
-            var keyword = $("#keyword").val();
-
+        // 获取根目录下的盘符按钮
+        function getRootDrives() {
             $.ajax({
-                url: "/",
-                method: "POST",
-                data: {
-                    selected_path: selectedPath,
-                    keyword: keyword
-                },
-                success: function (data) {
-                    $("#results").html(data);
+                url: '/root-drives',
+                type: 'GET',
+                success: function(response) {
+                    var pathButtons = document.getElementById('path-buttons');
+                    pathButtons.innerHTML = '';
+
+                    response.forEach(function(drive) {
+                        var button = document.createElement('button');
+                        button.setAttribute('type', 'button');
+                        button.setAttribute('class', 'folder-btn');
+                        button.setAttribute('onclick', 'getSubdirectories("' + drive + ':\\\\")');
+                        button.innerHTML = drive + ':\\';
+                        pathButtons.appendChild(button);
+                    });
                 }
             });
-        });
+        }
 
-        // 获取文件内容
-        function getFileContent(path, line, keyword) {
+        // 获取指定路径下的子文件夹按钮
+        function getSubdirectories(path) {
             $.ajax({
-                url: "/file-content",
-                method: "GET",
-                data: {
-                    path: path,
-                    line: line,
-                    keyword: keyword
-                },
-                success: function (data) {
-                    // 处理文件内容，例如将结果显示在模态框中
-                    // ...
+                url: '/subdirectories',
+                type: 'GET',
+                data: { path: path },
+                success: function(response) {
+                    var pathButtons = document.getElementById('path-buttons');
+                    pathButtons.innerHTML = '';
+
+                    var backButton = document.createElement('button');
+                    backButton.setAttribute('type', 'button');
+                    backButton.setAttribute('class', 'folder-btn');
+                    backButton.setAttribute('onclick', 'getRootDrives()');
+                    backButton.innerHTML = '返回';
+                    pathButtons.appendChild(backButton);
+
+                    response.forEach(function(subdirectory) {
+                        var button = document.createElement('button');
+                        button.setAttribute('type', 'button');
+                        button.setAttribute('class', 'folder-btn');
+                        button.setAttribute('onclick', 'getSubdirectories("' + path + '/' + subdirectory + '")');
+                        button.innerHTML = subdirectory;
+                        pathButtons.appendChild(button);
+                    });
+
+
+                    var confirmButton = document.createElement('button');
+                    confirmButton.setAttribute('type', 'button');
+                    confirmButton.setAttribute('class', 'folder-btn');
+                    confirmButton.setAttribute('onclick', 'selectPath("' + path + '")');
+                    confirmButton.innerHTML = '确定';
+                    pathButtons.appendChild(confirmButton);
                 }
             });
+        }
+
+        // 选择路径并更新表单
+        function selectPath(path) {
+            document.getElementById('selected-path').value = path;
+        }
+
+        // 提交表单
+        function submitForm() {
+            var selectedPath = document.getElementById('selected-path').value;
+            document.getElementById('search-form').setAttribute('action', '/');
+            document.getElementById('selected-path').value = selectedPath;
+            document.getElementById('search-form').submit();
         }
     </script>
 </body>
