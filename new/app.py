@@ -85,11 +85,12 @@ def search_files(path, keyword):
         for file in files:
             if allowed_file(file):
                 file_path = os.path.join(root, file)
-                result = {
-                    'path': file_path,
-                    'lines': []
-                }
-                results.append(result)
+                if find_keyword_lines(file_path, keyword):
+                    result = {
+                        'path': file_path,
+                        'lines': find_keyword_lines(file_path, keyword)
+                    }
+                    results.append(result)
     return results
 
 
@@ -113,7 +114,7 @@ def find_keyword_lines(file_path, keyword):
     return lines
 
 
-# 获取指定文件内容
+# 获取文件内容
 def get_file_content(path, line, keyword):
     content = ''
     if path.endswith('.pdf'):
