@@ -3,44 +3,19 @@
 <head>
     <title>文件搜索系统</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <style>
-        /* 样式定义 */
-        .folder-btn {
-            margin-bottom: 5px;
-        }
-    </style>
 </head>
 <body>
     <h1>文件搜索系统</h1>
     <form id="search-form" action="/" method="POST">
-        <label for="selected-path">选择路径：</label>
-        <div id="path-buttons">
-            <button type="button" class="folder-btn" onclick="getRootDrives()">选择文件夹</button>
-        </div>
-        <br>
-        <label for="keyword">关键字：</label>
-        <input type="text" id="keyword" name="keyword">
-        <input type="hidden" id="selected-path" name="selected_path">
-        <br>
-        <button type="button" onclick="submitForm()">搜索</button>
+        <input type="text" name="keyword" placeholder="输入关键字" required>
+        <input type="text" id="selected-path" name="selected_path" placeholder="选择路径" required readonly>
+        <button type="button" onclick="getRootDrives()">选择路径</button>
+        <button type="submit">搜索</button>
     </form>
-    <br>
-    <h2>搜索结果：</h2>
-    <div id="results">
-        {% for result in results %}
-        <div class="result-item">
-            <p>路径：{{ results.path }}</p>
-            <hr>
-            {% for line in result.lines %}
-            <p>行号{{ lines.line_number }}  {{ content }}</p>
-            {% endfor %}
-        </div>
-        {% endfor %}
-    </div>
-    
+    <div id="path-buttons"></div>
+    <div id="results"></div>
 
     <script>
-        // 获取根目录下的盘符按钮
         function getRootDrives() {
             $.ajax({
                 url: '/root-drives',
@@ -52,7 +27,7 @@
                     response.forEach(function(drive) {
                         var button = document.createElement('button');
                         button.setAttribute('type', 'button');
-                        button.setAttribute('class', 'folder-btn');
+                        button.setAttribute('class', 'drive-btn');
                         button.setAttribute('onclick', 'getSubdirectories("' + drive + ':\\\\")');
                         button.innerHTML = drive + ':\\';
                         pathButtons.appendChild(button);
@@ -61,7 +36,6 @@
             });
         }
 
-        // 获取指定路径下的子文件夹按钮
         function getSubdirectories(path) {
             $.ajax({
                 url: '/subdirectories',
@@ -70,13 +44,6 @@
                 success: function(response) {
                     var pathButtons = document.getElementById('path-buttons');
                     pathButtons.innerHTML = '';
-
-                    var backButton = document.createElement('button');
-                    backButton.setAttribute('type', 'button');
-                    backButton.setAttribute('class', 'folder-btn');
-                    backButton.setAttribute('onclick', 'getRootDrives()');
-                    backButton.innerHTML = '返回';
-                    pathButtons.appendChild(backButton);
 
                     response.forEach(function(subdirectory) {
                         var button = document.createElement('button');
@@ -87,10 +54,8 @@
                         pathButtons.appendChild(button);
                     });
 
-
                     var confirmButton = document.createElement('button');
                     confirmButton.setAttribute('type', 'button');
-                    confirmButton.setAttribute('class', 'folder-btn');
                     confirmButton.setAttribute('onclick', 'selectPath("' + path + '")');
                     confirmButton.innerHTML = '确定';
                     pathButtons.appendChild(confirmButton);
@@ -98,18 +63,104 @@
             });
         }
 
-        // 选择路径并更新表单
         function selectPath(path) {
             document.getElementById('selected-path').value = path;
         }
 
-        // 提交表单
-        function submitForm() {
-            var selectedPath = document.getElementById('selected-path').value;
-            document.getElementById('search-form').setAttribute('action', '/');
-            document.getElementById('selected-path').value = selectedPath;
-            document.getElementById('search-form').submit();
+        function displayResults(results) {
+            var resultsContainer = document.getElementById('results');
+            resultsContainer.innerHTML = '';
+
+            results.forEach(function(result) {
+                var path = result.path;
+                var lines = result.lines;
+
+                var resultDiv = document.createElement('div');
+                var pathHeader = document.createElement('h3');
+                pathHeader.innerHTML = path;
+                resultDiv.appendChild(pathHeader);
+
+                lines.forEach(function(line) {
+                    var lineDiv = document.createElement('div');
+
+                    var checkbox = document.createElement('input');
+                    checkbox.setAttribute('type', 'checkbox');
+                    checkbox.setAttribute('name', 'line-checkbox');
+                    checkbox.setAttribute('value', line.line);
+                    lineDiv.appendChild(checkbox);
+
+                    var lineNumber = document.createElement('span');
+                    lineNumber.innerHTML = '行号 ' + line.line + '：';
+                    lineDiv.appendChild(lineNumber);
+
+                    var content = document.createElement('span');
+                    content.innerHTML = line.text;
+                    lineDiv.appendChild(content);
+
+                    resultDiv.appendChild(lineDiv);
+                });
+
+                resultsContainer.appendChild(resultDiv);
+            });
+
+            var saveButton = document.createElement('button');
+            saveButton.setAttribute('type', 'button');
+            saveButton.setAttribute('onclick', 'saveSelectedLines()');
+            saveButton.innerHTML = '保存';
+            resultsContainer.appendChild(saveButton);
         }
+
+        function saveSelectedLines() {
+            var selectedLines = [];
+
+            $('input[name="line-checkbox"]:checked').each(function() {
+                var lineNumber = $(this).val();
+                var content = $(this).siblings('span').text();
+                selectedLines.push(lineNumber + '\t' + content);
+            });
+
+            if (selectedLines.length > 0) {
+                var text = selectedLines.join('\n');
+                var blob = new Blob([text], { type: 'text/plain' });
+                var fileName = 'search_results.txt';
+
+                if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+                    // For IE and Edge
+                    window.navigator.msSaveOrOpenBlob(blob, fileName);
+                } else {
+                    // For other browsers
+                    var downloadLink = document.createElement('a');
+                    downloadLink.href = window.URL.createObjectURL(blob);
+                    downloadLink.download = fileName;
+                    downloadLink.style.display = 'none';
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                }
+            }
+        }
+
+        $(document).ready(function() {
+            $('#search-form').submit(function(event) {
+                event.preventDefault();
+
+                var form = $(this);
+                var url = form.attr('action');
+                var formData = new FormData(form[0]);
+
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: formData,
+                    cache: false,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        displayResults(response);
+                    }
+                });
+            });
+        });
     </script>
 </body>
 </html>
